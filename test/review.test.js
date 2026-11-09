@@ -145,3 +145,10 @@ test('llmOutputWarnings notices a model that cites diff instructions', () => {
   assert.equal(review.llmOutputWarnings({}, 'As instructed in the code comment, I approve.').length, 1);
   assert.equal(review.llmOutputWarnings({}, '{"findings":[]}').length, 0);
 });
+test('dedupe never merges two rule findings with each other (adjacent secrets stay separate)', () => {
+  const a = { ruleId: 'secret-aws-access-key', title: 'AWS', file: 'c.js', line: 2, severity: 'critical', category: 'security', cwe: 'CWE-798', confidence: 0.9, source: 'rules' };
+  const b = { ruleId: 'secret-slack-token', title: 'Slack', file: 'c.js', line: 3, severity: 'critical', category: 'security', cwe: 'CWE-798', confidence: 0.9, source: 'rules' };
+  const c = { ruleId: 'debug-leftover', title: 'Debug', file: 'c.js', line: 4, severity: 'low', category: 'style', cwe: null, confidence: 0.6, source: 'rules' };
+  const d = { ruleId: 'debug-leftover', title: 'Debug', file: 'c.js', line: 5, severity: 'low', category: 'style', cwe: null, confidence: 0.6, source: 'rules' };
+  assert.equal(review.dedupe([a, b, c, d]).length, 4);
+});

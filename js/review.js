@@ -112,6 +112,7 @@
   const tokens = (s) => new Set(String(s || '').toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2));
   function similar(a, b) {
     if (a.ruleId === b.ruleId) return true;
+    if (a.line != null && a.line === b.line && a.category === b.category && a.source !== b.source) return true;
     if (a.cwe && b.cwe && a.cwe === b.cwe) return true;
     if (a.ruleId.replace(/^llm-/, '').split('-')[0] === b.ruleId.replace(/^llm-/, '').split('-')[0] && a.ruleId.replace(/^llm-/, '').length > 2) return true;
     const ta = tokens(a.title + ' ' + a.ruleId); const tb = tokens(b.title + ' ' + b.ruleId); let inter = 0; for (const t of ta) if (tb.has(t)) inter++;
@@ -121,7 +122,7 @@
   function dedupe(list) {
     const out = [];
     for (const f of list) {
-      const dup = out.find((g) => g.file === f.file && g.line != null && f.line != null && Math.abs(g.line - f.line) <= 1 && similar(g, f));
+      const dup = out.find((g) => !g.sources.includes(f.source || 'rules') && g.file === f.file && g.line != null && f.line != null && Math.abs(g.line - f.line) <= 1 && similar(g, f));
       if (!dup) { out.push(Object.assign({}, f, { sources: [f.source || 'rules'] })); continue; }
       if (!dup.sources.includes(f.source || 'rules')) dup.sources.push(f.source || 'rules');
       if (rank(f.severity) < rank(dup.severity)) dup.severity = f.severity;
