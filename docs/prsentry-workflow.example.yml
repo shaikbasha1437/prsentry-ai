@@ -1,0 +1,34 @@
+# Example workflow for PRSentry AI. Copy to .github/workflows/prsentry.yml in YOUR repository.
+# Rules mode needs no secrets and sends nothing outside GitHub.
+name: PRSentry review
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+permissions:
+  contents: read
+  pull-requests: write      # post the review
+  security-events: write    # only needed with upload-sarif: true
+jobs:
+  review:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: shaikbasha1437/prsentry-ai/action@main   # pin to a commit SHA in production
+        with:
+          mode: rules            # or: llm (see below)
+          fail-on: high          # critical | high | medium | low | info | none
+          post-review: true
+          upload-sarif: false    # true = show results in the Security tab / PR checks
+          max-comments: 30
+          # dry-run: true        # analyse + annotations + job summary only, no GitHub writes
+          # disabled-rules: debug-leftover,todo-added
+
+      # Optional AI pass with your own key stored as a repository secret.
+      # This sends the PR diff to the provider. Do not enable it for repositories whose code must not leave GitHub.
+      # - uses: shaikbasha1437/prsentry-ai/action@main
+      #   with:
+      #     mode: llm
+      #     llm-provider: anthropic          # openai | anthropic | gemini | compatible
+      #     llm-model: claude-haiku-4-5
+      #     llm-api-key: ${{ secrets.PRSENTRY_LLM_KEY }}
+      #     max-llm-chunks: 6

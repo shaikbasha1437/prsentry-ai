@@ -1,0 +1,23 @@
+# Self-test of the bundled action on this repository's own pull requests.
+# Rules mode only: no LLM, no secrets beyond the automatic GITHUB_TOKEN. Never fails the check (fail-on: none).
+name: PRSentry self-test (rules only)
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+  pull-requests: write
+  security-events: write
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./action
+        id: prsentry
+        with:
+          mode: rules
+          fail-on: none
+          post-review: true
+          upload-sarif: true
+      - run: echo "PRSentry -> ${{ steps.prsentry.outputs.recommendation }} (score ${{ steps.prsentry.outputs.score }}, ${{ steps.prsentry.outputs.findings }} findings)"
