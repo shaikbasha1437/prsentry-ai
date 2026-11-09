@@ -1,0 +1,57 @@
+diff --git a/src/invoices/header.js b/src/invoices/header.js
+index 005ab8a..24ace4b 100644
+--- a/src/invoices/header.js
++++ b/src/invoices/header.js
+@@ -1,5 +1,5 @@
++import { isoDay } from '../lib/dates.js';
++
+ export function invoiceHeader(invoice) {
+-  const d = new Date(invoice.issuedAt);
+-  const issued = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+-  return 'Invoice ' + invoice.number + ' issued ' + issued;
++  return `Invoice ${invoice.number} issued ${isoDay(invoice.issuedAt)}`;
+ }
+diff --git a/src/lib/dates.js b/src/lib/dates.js
+new file mode 100644
+index 0000000..d7ef8a6
+--- /dev/null
++++ b/src/lib/dates.js
+@@ -0,0 +1,8 @@
++/** Format a Date or ISO string as YYYY-MM-DD in local time. */
++export function isoDay(value) {
++  const d = value instanceof Date ? value : new Date(value);
++  if (Number.isNaN(d.getTime())) throw new RangeError('Invalid date: ' + value);
++  const month = String(d.getMonth() + 1).padStart(2, '0');
++  const day = String(d.getDate()).padStart(2, '0');
++  return `${d.getFullYear()}-${month}-${day}`;
++}
+diff --git a/src/orders/summary.js b/src/orders/summary.js
+index b2b4f3e..563bdfa 100644
+--- a/src/orders/summary.js
++++ b/src/orders/summary.js
+@@ -1,5 +1,5 @@
++import { isoDay } from '../lib/dates.js';
++
+ export function orderSummary(order) {
+-  const d = new Date(order.placedAt);
+-  const placed = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+-  return { id: order.id, placed, total: order.total };
++  return { id: order.id, placed: isoDay(order.placedAt), total: order.total };
+ }
+diff --git a/test/dates.test.js b/test/dates.test.js
+new file mode 100644
+index 0000000..f38c64c
+--- /dev/null
++++ b/test/dates.test.js
+@@ -0,0 +1,11 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { isoDay } from '../src/lib/dates.js';
++
++test('formats a date as YYYY-MM-DD', () => {
++  assert.equal(isoDay(new Date(2026, 0, 5)), '2026-01-05');
++});
++
++test('rejects invalid input', () => {
++  assert.throws(() => isoDay('not a date'), RangeError);
++});

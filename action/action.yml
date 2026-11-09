@@ -1,0 +1,67 @@
+name: 'PRSentry AI review'
+description: 'Rule-based (and optional bring-your-own-key LLM) review of a pull request diff for security issues and bugs. Uploads SARIF and/or posts a PR review.'
+author: 'shaikbasha1437'
+branding:
+  icon: 'shield'
+  color: 'green'
+inputs:
+  github-token:
+    description: 'Token used to read the PR diff and (optionally) post the review / upload SARIF. The default GITHUB_TOKEN is enough.'
+    default: ${{ github.token }}
+  mode:
+    description: '"rules" (default, no AI, nothing leaves GitHub) or "llm" (rules + LLM review; sends the diff to your chosen provider).'
+    default: 'rules'
+  llm-provider:
+    description: 'openai | anthropic | gemini | compatible (OpenAI-compatible endpoint such as OpenRouter or a self-hosted Ollama).'
+    default: 'openai'
+  llm-model:
+    description: 'Model name. Empty = provider default.'
+    default: ''
+  llm-api-key:
+    description: 'API key for the LLM provider. Pass it from a repository secret, never inline.'
+    default: ''
+  llm-base-url:
+    description: 'Base URL for "compatible" providers, e.g. https://openrouter.ai/api/v1'
+    default: ''
+  max-llm-chunks:
+    description: 'Upper bound on LLM requests per run (each chunk is ~12k characters of diff).'
+    default: '6'
+  fail-on:
+    description: 'Fail the check when an open finding is at or above this severity: critical | high | medium | low | info | none.'
+    default: 'high'
+  post-review:
+    description: 'Post a pull request review with inline comments.'
+    default: 'true'
+  allow-approve:
+    description: 'Allow an APPROVE review when nothing is found (otherwise COMMENT). Repos usually block Actions from approving.'
+    default: 'false'
+  upload-sarif:
+    description: 'Upload SARIF to GitHub code scanning (needs security-events: write; code scanning must be available for the repo).'
+    default: 'false'
+  sarif-file:
+    description: 'Where to write the SARIF report (relative to the workspace).'
+    default: 'prsentry.sarif'
+  max-comments:
+    description: 'Maximum inline comments per review.'
+    default: '30'
+  disabled-rules:
+    description: 'Comma-separated rule IDs to turn off, e.g. "debug-leftover,todo-added".'
+    default: ''
+  pr-number:
+    description: 'PR number override (for workflow_dispatch). Defaults to the triggering pull_request.'
+    default: ''
+  dry-run:
+    description: 'Analyse and write SARIF/summary/annotations, but never call GitHub write APIs.'
+    default: 'false'
+outputs:
+  findings:
+    description: 'Number of findings.'
+  recommendation:
+    description: 'APPROVE | COMMENT | REQUEST_CHANGES'
+  score:
+    description: 'Score 0-100.'
+  sarif-file:
+    description: 'Path of the SARIF report.'
+runs:
+  using: 'node24'
+  main: 'index.js'
