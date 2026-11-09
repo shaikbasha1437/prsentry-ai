@@ -55,7 +55,7 @@
     $('.modal-body').addEventListener('input', () => { if (modal && modal.watch) modal.dirty = true; });
     if (op.save) $('#modal-save').onclick = () => op.save();
     if (op.onmount) op.onmount();
-    setTimeout(() => { const first = $('.modal-body input:not([type=checkbox]):not([type=hidden]),.modal-body textarea,.modal-body select'); (op.focusFirst && first ? first : $('.modal [data-close=x]')).focus(); }, 0);
+    setTimeout(() => { if (!modal) return; const first = $('.modal-body input:not([type=checkbox]):not([type=hidden]),.modal-body textarea,.modal-body select'); const el = op.focusFirst && first ? first : $('.modal [data-close=x]'); if (el) el.focus(); }, 0);
   }
   function removeModal() { modal = null; $('#modal-host').innerHTML = ''; document.body.style.overflow = ''; if (lastFocus && lastFocus.focus && document.contains(lastFocus)) lastFocus.focus(); }
   function closeModal(force) { if (!modal) return; if (!force && modal.dirty && !confirm('Discard unsaved changes?')) return; modal.dirty = false; history.back(); }
@@ -256,7 +256,7 @@
   }
 
   /* ---------------- AI review ---------------- */
-  function cfg() { const p = LLM.PROVIDERS[settings.provider]; return { provider: settings.provider, key: keys.llm, model: settings.model || p.defaultModel, baseUrl: settings.baseUrl || undefined }; }
+  function cfg() { const p = LLM.PROVIDERS[settings.provider]; return { provider: settings.provider, key: keys.llm, model: settings.model || p.defaultModel, baseUrl: (settings.provider === 'compatible' && settings.baseUrl) || undefined }; }
   function confirmAi() {
     if (!state || !keyReady()) return;
     const chunks = V.chunkDiff(files, 12000); const use = chunks.slice(0, settings.maxChunks || 6);
@@ -341,7 +341,7 @@
         $('#s-provider').onchange = sync; sync();
         $('#s-forget').onclick = () => { const old = Object.assign({}, keys); keys = { llm: '', github: '' }; store.del(LS.keys); $('#s-key').value = ''; $('#s-gh').value = ''; render(); toast('Keys forgotten on this device.', () => { keys = old; saveSettings(); render(); }); };
         $('#s-test').onclick = async () => {
-          const c = { provider: $('#s-provider').value, key: $('#s-key').value.trim(), model: $('#s-model').value.trim() || LLM.PROVIDERS[$('#s-provider').value].defaultModel, baseUrl: $('#s-base').value.trim() || undefined };
+          const c = { provider: $('#s-provider').value, key: $('#s-key').value.trim(), model: $('#s-model').value.trim() || LLM.PROVIDERS[$('#s-provider').value].defaultModel, baseUrl: ($('#s-provider').value === 'compatible' && $('#s-base').value.trim()) || undefined };
           $('#s-test-out').textContent = 'Testing…';
           try { const out = await LLM.call(c, { system: 'Reply with the JSON {"ok":true} only.', messages: [{ role: 'user', content: 'ping' }], maxTokens: 20, temperature: 0 }, { timeoutMs: 30000 }); $('#s-test-out').textContent = '✓ Connected to ' + LLM.PROVIDERS[c.provider].label + ' (' + (out.model || c.model) + ', ' + out.latencyMs + ' ms).'; }
           catch (e) { $('#s-test-out').textContent = '✗ ' + (e.message || e); }
