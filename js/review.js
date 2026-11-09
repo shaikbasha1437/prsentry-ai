@@ -17,7 +17,7 @@
   function numberedFile(file) {
     const out = ['FILE: ' + file.path + ' (' + file.status + (file.oldPath && file.oldPath !== file.path ? ', from ' + file.oldPath : '') + ')'];
     for (const h of file.hunks) {
-      out.push('@@ ' + (h.header || '') );
+      out.push('@@ -' + h.oldStart + ',' + h.oldLines + ' +' + h.newStart + ',' + h.newLines + ' @@' + (h.header ? ' ' + h.header : ''));
       for (const l of h.lines) {
         if (l.type === 'add') out.push('+' + String(l.newNo).padStart(5) + ' | ' + l.text);
         else if (l.type === 'ctx') out.push(' ' + String(l.newNo).padStart(5) + ' | ' + l.text);
@@ -219,8 +219,8 @@
     const ruleIds = uniq(act.map((f) => f.ruleId));
     const rulesOut = ruleIds.map((id) => {
       const c = catalog.get(id); const f = act.find((x) => x.ruleId === id);
-      const tags = [f.category]; if (f.cwe) tags.push('external/cwe/' + f.cwe.toLowerCase()); if (f.category === 'security') tags.push('security');
-      const r = { id, name: id.replace(/(^|-)([a-z])/g, (m, a, b) => b.toUpperCase()), shortDescription: { text: (c ? c.title : f.title).slice(0, 200) }, fullDescription: { text: ((c && c.explain) || f.explanation || f.title).slice(0, 1000) }, defaultConfiguration: { level: SARIF_LEVEL[(c && c.severity) || f.severity] }, properties: { tags, precision: f.confidence >= 0.8 ? 'high' : f.confidence >= 0.6 ? 'medium' : 'low' } };
+      const tags = [f.category]; if (f.cwe) tags.push('external/cwe/' + f.cwe.toLowerCase()); if (f.category !== 'security') tags.push('maintainability');
+      const r = { id, name: id.replace(/(^|-)([a-z])/g, (m, a, b) => b.toUpperCase()), shortDescription: { text: (c ? c.title : f.title).slice(0, 200) }, fullDescription: { text: ((c && c.explain) || f.explanation || f.title).slice(0, 1000) }, defaultConfiguration: { level: SARIF_LEVEL[(c && c.severity) || f.severity] }, properties: { tags: uniq(tags), precision: f.confidence >= 0.8 ? 'high' : f.confidence >= 0.6 ? 'medium' : 'low' } };
       if (f.category === 'security') r.properties['security-severity'] = SEC_SEVERITY[f.severity];
       if (c) r.helpUri = 'https://github.com/shaikbasha1437/prsentry-ai/blob/main/docs/RULES.md#' + id;
       return r;
@@ -244,6 +244,7 @@
     for (const [i, run] of ((doc && doc.runs) || []).entries()) {
       if (!run.tool || !run.tool.driver || typeof run.tool.driver.name !== 'string') errs.push('runs[' + i + '].tool.driver.name required');
       const ids = new Set(((run.tool && run.tool.driver && run.tool.driver.rules) || []).map((r) => r.id));
+      for (const r of (run.tool && run.tool.driver && run.tool.driver.rules) || []) { const tg = (r.properties && r.properties.tags) || []; if (new Set(tg).size !== tg.length) errs.push('rule ' + r.id + ' has duplicate tags'); }
       for (const [j, r] of (run.results || []).entries()) {
         if (!r.message || typeof r.message.text !== 'string') errs.push('result ' + j + ' message.text required');
         if (r.level && !['none', 'note', 'warning', 'error'].includes(r.level)) errs.push('result ' + j + ' bad level');

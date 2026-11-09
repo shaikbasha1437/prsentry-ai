@@ -41,7 +41,7 @@
   function envName(v) { return String(v).replace(/([a-z0-9])([A-Z])/g, '$1_$2').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').toUpperCase() || 'SECRET'; }
   const PLACEHOLDER = /^(x{3,}|\*{3,}|\.{3,}|your[_-]|<|\$\{|\{\{|%\(|process\.env|os\.environ|changeme|change[_-]me|placeholder|dummy|redacted|replace[_-]?me|todo|none|null|undefined|true|false|password|secret|token)$|^(your|my|insert|enter)[_-]/i;
   const USER_INPUT = /\b(req|request)\.(query|params|body|args|form|values|GET|POST|json|files|cookies|headers)\b|\bparams\[|\b(location\.(search|hash|href)|window\.name|document\.(URL|referrer|cookie)|searchParams\.get|event\.data|props\.\w+|userInput|user_input|input\(|sys\.argv|process\.argv)/;
-  const SENSITIVE = /\b(pass(word|wd)?|pwd|secret|token|api[_-]?key|apikey|authorization|auth[_-]?header|credit[_-]?card|card[_-]?number|cvv|ssn|private[_-]?key|session[_-]?id|cookie)\b/i;
+  const SENSITIVE = /(pass(?:word|wd)|\bpwd\b|secret|token|api[_-]?key|authorization|auth[_-]?header|credit[_-]?card|card[_-]?number|\bcvv\b|\bssn\b|private[_-]?key|session[_-]?id|\bcookie)/i;
 
   /* Rule list. test(text, ctx) returns a match object/array or null; fix(text, m, ctx) returns replacement line(s) or null. */
   const RULES = [
@@ -107,9 +107,9 @@
     // ---------------- Injection ----------------
     { id: 'sql-injection', title: 'SQL built with string interpolation or concatenation', severity: 'high', category: 'security', cwe: 'CWE-89', confidence: 0.8, scope: 'code',
       test: (t) => {
-        if (!/["'`]\s*(?:SELECT\s[\s\S]*?\bFROM\b|INSERT\s+INTO\b|UPDATE\s+[\w."`\[\]]+\s+SET\b|DELETE\s+FROM\b|SELECT\s+\*|[^"'`]*\bWHERE\s+[\w."`]+\s*(?:=|LIKE|IN|>|<))/i.test(t) && !/\b(?:SELECT|INSERT|UPDATE|DELETE)\b[^"'`]*\b(?:FROM|INTO|SET|WHERE)\b/i.test(t)) return null;
+        if (!/(["'])(?:(?!\1).)*\b(?:AND|OR|WHERE)\s+[\w."`]+\s*(?:=|LIKE|IN|<|>)(?:(?!\1).)*\1\s*\+/i.test(t) && !/["'`]\s*(?:SELECT\s[\s\S]*?\bFROM\b|INSERT\s+INTO\b|UPDATE\s+[\w."`\[\]]+\s+SET\b|DELETE\s+FROM\b|SELECT\s+\*|[^"'`]*\bWHERE\s+[\w."`]+\s*(?:=|LIKE|IN|>|<))/i.test(t) && !/\b(?:SELECT|INSERT|UPDATE|DELETE)\b[^"'`]*\b(?:FROM|INTO|SET|WHERE)\b/i.test(t)) return null;
         const forms = [/`[^`]*\b(?:SELECT|INSERT|UPDATE|DELETE|WHERE|FROM)\b[^`]*\$\{[^}]+\}[^`]*`/i, /\bf(["'])(?:(?!\1).)*\b(?:SELECT|INSERT|UPDATE|DELETE|WHERE|FROM)\b(?:(?!\1).)*\{[^}]+\}/i,
-          /(["'])[^"']*\b(?:SELECT|INSERT|UPDATE|DELETE|WHERE|FROM|VALUES|AND|OR|LIKE|=)\b[^"']*\1\s*\+\s*[A-Za-z_$][\w$.\[\]()]*/i, /(["'])[^"']*\b(?:SELECT|INSERT|UPDATE|DELETE|WHERE|FROM)\b[^"']*%[sdr][^"']*\1\s*%\s*\(?[\w.]/i,
+          /(["'])(?:(?!\1).)*\b(?:SELECT|INSERT|UPDATE|DELETE|WHERE|FROM|VALUES|AND|OR|LIKE)\b(?:(?!\1).)*\1\s*\+\s*[A-Za-z_$][\w$.\[\]()]*/i, /(["'])[^"']*\b(?:SELECT|INSERT|UPDATE|DELETE|WHERE|FROM)\b[^"']*%[sdr][^"']*\1\s*%\s*\(?[\w.]/i,
           /(["'])[^"']*\b(?:SELECT|INSERT|UPDATE|DELETE|WHERE|FROM)\b[^"']*\{\d*\}[^"']*\1\s*\.format\(/i, /Sprintf\(\s*"[^"]*\b(?:SELECT|INSERT|UPDATE|DELETE|WHERE)\b[^"]*%[svd]/i, /\$"[^"]*\b(?:SELECT|INSERT|UPDATE|DELETE|WHERE)\b[^"]*\{[^}]+\}/i];
         for (const f of forms) { const m = f.exec(t); if (m) return m; }
         return null;
@@ -145,7 +145,11 @@
         return null;
       },
       fix: (t, m, ctx) => {
-        if (ctx.lang === 'py' && /shell\s*=\s*True/.test(t)) return t.replace(/shell\s*=\s*True/, 'shell=False');
+        if (ctx.lang === 'py' && /shell\s*=\s*True/.test(t)) {
+          const fm = /\bf(["'])((?:(?!\1).)*)\1/.exec(t);
+          if (fm && !/[|;&<>$`]/.test(fm[2])) { const args = fm[2].trim().split(/\s+/).map((tok) => (/^\{([\w.]+)\}$/.test(tok) ? tok.slice(1, -1) : /\{/.test(tok) ? 'f"' + tok + '"' : '"' + tok + '"')); return t.replace(fm[0], '[' + args.join(', ') + ']').replace(/,\s*shell\s*=\s*True/, '').replace(/shell\s*=\s*True\s*,\s*/, ''); }
+          return t.replace(/shell\s*=\s*True/, 'shell=False');
+        }
         if (ctx.lang === 'js' && /spawn.*shell\s*:\s*true/.test(t)) return t.replace(/shell\s*:\s*true/, 'shell: false');
         return null;
       },
@@ -486,7 +490,7 @@
             const lineCtx = Object.assign(Object.create(ctx), {
               around: (n) => { const w = ctx.window(l.newNo, n, n); return w.before.map((r) => r.text).concat([text], w.after.map((r) => r.text)).join('\n'); },
               next: (n) => { const w = ctx.window(l.newNo, 0, n); return w.after.length >= n ? w.after[n - 1].text : ''; },
-              inLoop: () => { const w = ctx.window(l.newNo, 6, 0); const ind = /^\s*/.exec(text)[0].length; for (let i = w.before.length - 1; i >= 0; i--) { const bt = w.before[i].text; if (!bt.trim()) continue; const bi = /^\s*/.exec(bt)[0].length; if (bi < ind && /^\s*(?:for\b(?!\s+await)|while\b|\w[\w.]*\.(?:forEach|map)\()/.test(bt)) return !/\bfor\s+await\b/.test(bt); if (bi < ind && /^\s*(?:(?:async\s+)?function|def|class|async def)\b|=>\s*\{\s*$/.test(bt) && !/\.(?:forEach|map)\(/.test(bt)) return false; } return false; }
+              inLoop: () => { const w = ctx.window(l.newNo, 8, 0); let min = /^\s*/.exec(text)[0].length; for (let i = w.before.length - 1; i >= 0; i--) { const bt = w.before[i].text; if (!bt.trim()) continue; const bi = /^\s*/.exec(bt)[0].length; if (bi >= min) continue; if (/^\s*(?:for\b|while\b|do\b)/.test(bt)) return !/\bfor\s+await\b/.test(bt); if (/^\s*(?:export\s+)?(?:(?:async\s+)?function|def|class|async def)\b|=>\s*\{\s*$|\bfunction\s*\(/.test(bt)) return false; min = bi; } return false; }
             });
             let secretHit = false;
             for (const r of RULES) {

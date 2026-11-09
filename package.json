@@ -1,0 +1,12 @@
+{
+  "name": "prsentry-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "PR review agent: deterministic security/bug rules + optional bring-your-own-key LLM review. Web app + GitHub Action.",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "demos": "node scripts/build-demos.mjs"
+  },
+  "engines": { "node": ">=20" }
+}
