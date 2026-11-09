@@ -21,7 +21,8 @@
   const PRESETS = [
     { id: 'ollama', label: 'Ollama (local)', baseUrl: 'http://localhost:11434/v1', model: 'llama3.2' },
     { id: 'lmstudio', label: 'LM Studio (local)', baseUrl: 'http://localhost:1234/v1', model: 'local-model' },
-    { id: 'openrouter', label: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', model: 'openai/gpt-5-mini' }
+    { id: 'openrouter', label: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', model: 'openai/gpt-5-mini' },
+    { id: 'demonroute', label: 'Demon Route', baseUrl: 'https://api.demonroute.com/v1', model: 'Qwen/Qwen3-Coder-Next' }
   ];
   function trimSlash(u) { return String(u || '').replace(/\/+$/, ''); }
   /* Vision: msg.images = [{ mime, data(base64, no prefix) }] are attached to the LAST user message
