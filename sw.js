@@ -1,4 +1,4 @@
-const CACHE = 'prsentry-v1';
+const CACHE = 'prsentry-v2';
 const FILES = ['./', './index.html', './styles.css', './js/app.js', './js/diff.js', './js/rules.js', './js/review.js', './js/github.js', './js/llm.js', './samples/demo-prs.json', './manifest.webmanifest', './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png'];
 self.addEventListener('install', (event) => { event.waitUntil((async () => { const cache = await caches.open(CACHE); for (const file of FILES) { try { const res = await fetch(file, { cache: 'reload' }); if (res.ok) await cache.put(file, res); } catch (e) { /* keep going: one missing file must not break install */ } } await self.skipWaiting(); })()); });
 self.addEventListener('activate', (event) => { event.waitUntil((async () => { for (const k of await caches.keys()) if (k.startsWith('prsentry-') && k !== CACHE) await caches.delete(k); await self.clients.claim(); })()); });
